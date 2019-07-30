@@ -44,7 +44,7 @@ impl<'a> KvStore<'a> {
         Ok(())
     }
 
-    fn read(&self, file: &mut File) -> Result<HashMap<String, u64>> {
+    fn read(&self, mut file: &mut File) -> Result<HashMap<String, u64>> {
         let mut commands = HashMap::new();
         let file_length = file.seek(SeekFrom::End(0))?;
         file.seek(SeekFrom::Start(0))?;
@@ -53,7 +53,7 @@ impl<'a> KvStore<'a> {
             if cur >= file_length {
                 break;
             }
-            let record: Record = bincode::deserialize_from(file)?;
+            let record: Record = bincode::deserialize_from(&mut file)?;
             println!("Read record: {:?}", record);
 
             commands.insert(record.key(), cur);
@@ -69,6 +69,7 @@ enum Record {
 }
 
 use byteorder::{NativeEndian, ReadBytesExt};
+use std::convert::TryInto;
 
 /// Serialization format
 /// --------------------
@@ -92,6 +93,14 @@ impl Record {
     }
 
     fn from_reader<S: Seek + Read>(reader: &mut S) -> Result<Record> {
+        fn read_string<S: Seek + Read>(reader: &mut S, length: u32) -> Result<String> {
+            let size = length.try_into().unwrap();
+            let mut bytes = vec![0u8; size];
+            reader.read_exact(&mut bytes)?;
+            let str = std::str::from_utf8(&bytes)?;
+            Ok(str.to_owned())
+        }
+
         let mut word = [0u8; 4];
         reader.read_exact(&mut word)?;
         let header = reader.read_u32::<NativeEndian>()?;
@@ -100,10 +109,12 @@ impl Record {
         match record_type {
             1 => {
                 let value_length = reader.read_u32::<NativeEndian>()?;
+                let key = read_string(reader, key_length)?;
+                let value = read_string(reader, value_length)?;
+                Ok(Record::Set(key, value))
             }
             2 => {
-                let mut key = [u8; value_length];
-                reader.read_exact(&mut key)?;
+                let key = read_string(reader, key_length)?;
                 Ok(Record::Rm(key))
             }
             other => Err(format_err!("Invalid record type {}", other)),

@@ -2,7 +2,7 @@
 extern crate clap;
 use clap::{App, Arg, SubCommand};
 
-fn main() {
+fn main() -> kvs::Result<()> {
     let key_arg = Arg::with_name("key").required(true);
     let matches = App::new(crate_name!())
         .version(crate_version!())
@@ -26,22 +26,22 @@ fn main() {
         )
         .get_matches();
 
-    let mut kvs = kvs::KvStore::new();
+    let mut kvs = kvs::KvStore::open(std::path::Path::new("temp.log"))?;
 
     match matches.subcommand() {
         ("set", Some(set_matches)) => {
             if let (Some(key), Some(value)) =
                 (set_matches.value_of("key"), set_matches.value_of("value"))
             {
-                kvs.set(key.to_string(), value.to_string());
-                unimplemented!("unimplemented")
+                kvs.set(key.to_string(), value.to_string())?;
+                Ok(())
             } else {
                 panic!("WTF: {:?}", set_matches);
             }
         }
         ("get", Some(get_matches)) => {
             if let Some(key) = get_matches.value_of("key") {
-                kvs.get(key.to_string());
+                kvs.get(key.to_string())?;
                 unimplemented!("unimplemented")
             } else {
                 panic!("WTF: {:?}", get_matches);
@@ -49,8 +49,8 @@ fn main() {
         }
         ("rm", Some(rm_matches)) => {
             if let Some(key) = rm_matches.value_of("key") {
-                kvs.remove(key.to_string());
-                unimplemented!("unimplemented")
+                kvs.remove(key.to_string())?;
+                Ok(())
             } else {
                 panic!("WTF: {:?}", rm_matches);
             }

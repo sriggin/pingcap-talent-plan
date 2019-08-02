@@ -1,5 +1,8 @@
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate failure;
+
 use clap::{App, Arg, SubCommand};
 
 fn main() -> kvs::Result<()> {
@@ -26,7 +29,7 @@ fn main() -> kvs::Result<()> {
         )
         .get_matches();
 
-    let mut kvs = kvs::KvStore::open(std::path::Path::new("temp.log"))?;
+    let mut kvs = kvs::KvStore::open(std::path::Path::new("."))?;
 
     match matches.subcommand() {
         ("set", Some(set_matches)) => {
@@ -41,8 +44,13 @@ fn main() -> kvs::Result<()> {
         }
         ("get", Some(get_matches)) => {
             if let Some(key) = get_matches.value_of("key") {
-                kvs.get(key.to_string())?;
-                unimplemented!("unimplemented")
+                match kvs.get(key.to_string())? {
+                    Option::Some(value) => {
+                        println!("{}", value);
+                        Ok(())
+                    }
+                    Option::None => Err(format_err!("Key not found")),
+                }
             } else {
                 panic!("WTF: {:?}", get_matches);
             }
